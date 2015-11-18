@@ -1,0 +1,11 @@
+video {
+  width: 200px;
+}
+
+.local {
+  border: 3px solid red;
+}
+
+.remote {
+  border: 3px solid purple;
+}

@@ -3,15 +3,28 @@ import http from 'http';
 import serveStatic from 'serve-static';
 import path from 'path';
 import SocketIO from 'socket.io';
+import webpack from 'webpack';
+import webpackMiddleware from 'webpack-dev-middleware';
+import webpackConfig from './webpack.config.babel';
 
 const app = express();
 const server = http.createServer(app);
 const io = new SocketIO(server);
 
+app.use(webpackMiddleware(webpack(webpackConfig)));
 app.use(serveStatic(path.join(__dirname, 'public')));
 
-io.on('connection', (/* socket */) => {
-  console.log('a user connected');
+io.on('connection', (socket) => {
+  console.log(`${socket.id} connected`);
+  io.emit('join', socket.id);
+  socket.on('disconnect', () => {
+    console.log(`${socket.id} disconnected`);
+    io.emit('leave', socket.id);
+  });
+  socket.on('signal', (signal) => {
+    console.log(`received ${signal.type} signal destined for ${signal.to}`);
+    io.emit('signal', signal);
+  });
 });
 
 server.listen(3000, () => {
