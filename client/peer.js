@@ -45,22 +45,41 @@ export default function Peer(opts) {
   function handleOffer(signal) {
     const { offer } = signal;
     console.log('received offer', offer);
-    pc.setRemoteDescription(new RTCSessionDescription(offer)).then(() => {
-      didSetRemoteDescription = true;
-      drainQueuedCandidates();
 
-      pc.createAnswer().then(answer => {
-        pc.setLocalDescription(answer).then(() => {
-          socket.emit('signal', {
-            type: 'answer',
-            from: socket.id,
-            to: peerId,
-            answer
-          });
-          console.log('sent answer', answer);
-        }, errorHandler('setLocalDescription'));
+    return new Promise((resolve, reject) => {
+      if (!signal.wantsRemoteVideo) {
+        return resolve();
+      }
+
+      const constraints = { audio: true, video: true };
+      getUserMedia(constraints, resolve, reject);
+    }).then((stream) => {
+      if (!stream) {
+        return;
+      }
+
+      attachMediaStream($localVideo, stream);
+      pc.addStream(stream);
+      $localVideo.play();
+    }).then(() => {
+      pc.setRemoteDescription(new RTCSessionDescription(offer)).then(() => {
+        didSetRemoteDescription = true;
+        drainQueuedCandidates();
+
+        pc.createAnswer().then(answer => {
+          console.log('calling setLocalDescription after createAnswer');
+          pc.setLocalDescription(answer).then(() => {
+            socket.emit('signal', {
+              type: 'answer',
+              from: socket.id,
+              to: peerId,
+              answer
+            });
+            console.log('sent answer', answer);
+          }, errorHandler('setLocalDescription'));
+        });
       });
-    })
+    });
   }
 
   function handleAnswer(signal) {
@@ -74,11 +93,13 @@ export default function Peer(opts) {
   }
 
   function onCreateOfferSuccess(offer) {
+    console.log('calling setLocalDescription in createOfferSuccess');
     pc.setLocalDescription(offer).then(() => {
       socket.emit('signal', {
         type: 'offer',
         from: socket.id,
         to: peerId,
+        wantsRemoteVideo: true,
         offer
       });
       console.trace('sent offer', offer);
@@ -92,6 +113,7 @@ export default function Peer(opts) {
       attachMediaStream($localVideo, stream);
       $localVideo.play();
       pc.addStream(stream);
+      pc.createOffer(onCreateOfferSuccess, errorHandler('renegotiation createOffer'));
     }, console.error.bind(console, 'getUserMedia failed'));
   }
 
@@ -122,8 +144,10 @@ export default function Peer(opts) {
   };
 
   pc.onnegotiationneeded = () => {
-    console.log('onnegotiationneeded');
-    pc.createOffer(onCreateOfferSuccess, errorHandler('renegotiation createOffer'))
+    if (pc.iceConnectionState == 'connected') {
+      console.log('onnegotiationneeded');
+      pc.createOffer(onCreateOfferSuccess, errorHandler('renegotiation createOffer'))
+    }
   };
 
   pc.onaddstream = obj => {
