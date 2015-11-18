@@ -1,0 +1,10 @@
+{
+  "root": true,
+  "extends": "airbnb",
+  "rules": {
+    "comma-dangle": [2, "never"],
+    "no-shadow": [0],
+    "spaced-comment": [0],
+    "no-console": [0]
+  }
+}

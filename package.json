@@ -1,0 +1,21 @@
+{
+  "name": "renegotiation",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Chad McElligott <cmcelligott@digium.com>",
+  "license": "MIT",
+  "dependencies": {
+    "babel-core": "^6.1.21",
+    "babel-loader": "^6.2.0",
+    "eslint": "^1.9.0",
+    "eslint-config-airbnb": "^1.0.0",
+    "eslint-plugin-react": "^3.9.0",
+    "react": "^0.14.2",
+    "webpack": "^1.12.6"
+  }
+}
