@@ -10,6 +10,7 @@ Object.keys(webrtc).forEach(key => (
 webrtcUtils.log = console.log.bind(console);
 
 const peers = new Map();
+window.peers = peers;
 const $peers = document.getElementById('peers');
 const socket = window.socket = io();
 
@@ -21,26 +22,21 @@ function createControls(socketId) {
   const $localVideo = document.createElement('video');
   $localVideo.setAttribute('data-type', 'video');
   $localVideo.setAttribute('muted', 'true');
-  const $localScreenShare = document.createElement('video');
-  $localScreenShare.setAttribute('data-type', 'screenShare');
 
-  const $screenshareButton = document.createElement('button');
-  $screenshareButton.appendChild(document.createTextNode('Screenshare'));
+  const $toggleAudioButton = document.createElement('button');
+  $toggleAudioButton.appendChild(document.createTextNode('Toggle audio'));
 
   const $remoteVideo = document.createElement('video');
   $remoteVideo.setAttribute('data-type', 'video');
-  const $remoteScreenShare = document.createElement('video');
-  $remoteScreenShare.setAttribute('data-type', 'screenShare');
 
   const $localControls = document.createElement('div');
   $localControls.className = 'local';
   $localControls.appendChild($localVideo);
-  $localControls.appendChild($localScreenShare);
+  $localControls.appendChild($toggleAudioButton);
 
   const $remoteControls = document.createElement('div');
   $remoteControls.className = 'remote';
   $remoteControls.appendChild($remoteVideo);
-  $remoteControls.appendChild($remoteScreenShare);
 
   const $controlHeader = document.createElement('h1');
   $controlHeader.appendChild(document.createTextNode(socketId));
@@ -55,10 +51,8 @@ function createControls(socketId) {
 
   return {
     $localVideo,
-    $localScreenShare,
     $remoteVideo,
-    $remoteScreenShare,
-    $screenshareButton
+    $toggleAudioButton
   };
 }
 
