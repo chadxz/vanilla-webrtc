@@ -6,5 +6,18 @@
     "no-shadow": [0],
     "spaced-comment": [0],
     "no-console": [0]
+  },
+  "ecmaFeatures": {
+    "experimentalObjectRestSpread": [0]
+  },
+  "env": {
+    "browser": true
+  },
+  "globals": {
+    "io": false,
+    "RTCPeerConnection": false,
+    "webrtcUtils": false,
+    "getUserMedia": false,
+    "attachMediaStream": false
   }
 }

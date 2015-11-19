@@ -19,7 +19,7 @@ export default function Peer(opts) {
   let videoCallStream = null;
   let screenShareStream = null;
   let didSetRemoteDescription = false;
-  let queuedIceCandidates = [];
+  const queuedIceCandidates = [];
 
   function errorHandler(processName) {
     return console.error.bind(console, `${processName} failed`);
@@ -138,15 +138,15 @@ export default function Peer(opts) {
   };
 
   pc.oniceconnectionstatechange = () => {
-    if (pc.iceConnectionState == 'connected') {
+    if (pc.iceConnectionState === 'connected') {
       console.log('connected.');
     }
   };
 
   pc.onnegotiationneeded = () => {
-    if (pc.iceConnectionState == 'connected') {
+    if (pc.iceConnectionState === 'connected') {
       console.log('onnegotiationneeded');
-      pc.createOffer(onCreateOfferSuccess, errorHandler('renegotiation createOffer'))
+      pc.createOffer(onCreateOfferSuccess, errorHandler('renegotiation createOffer'));
     }
   };
 
@@ -170,17 +170,17 @@ export default function Peer(opts) {
     console.log(`received '${signal.type}' signal from ${signal.from} destined for ${signal.to}`);
 
     switch (signal.type) {
-      case 'icecandidate':
-        handleIceCandidate(signal);
-        break;
-      case 'offer':
-        handleOffer(signal);
-        break;
-      case 'answer':
-        handleAnswer(signal);
-        break;
-      default:
-        console.warn('received signal I have no idea what to do with', signal);
+    case 'icecandidate':
+      handleIceCandidate(signal);
+      break;
+    case 'offer':
+      handleOffer(signal);
+      break;
+    case 'answer':
+      handleAnswer(signal);
+      break;
+    default:
+      console.warn('received signal I have no idea what to do with', signal);
     }
   });
 
