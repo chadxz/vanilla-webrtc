@@ -12,14 +12,19 @@
  * @returns {{peerId: *, startVideoCall: startVideoCall}}
  */
 export default function Peer(opts) {
-  const { socket, $localVideo, $localScreenShare, $remoteVideo, $remoteScreenShare } = opts;
+  const {
+    socket,
+    $localVideo,
+    $remoteVideo,
+    $toggleAudioButton
+  } = opts;
   const peerId = opts.socketId;
-
+  let renegotiating = false;
   const pc = new RTCPeerConnection();
-  let videoCallStream = null;
-  let screenShareStream = null;
-  let didSetRemoteDescription = false;
   const queuedIceCandidates = [];
+
+  let videoOnlyStream = null;
+  let videoWithAudioStream = null;
 
   function errorHandler(processName) {
     return console.error.bind(console, `${processName} failed`);
@@ -33,7 +38,9 @@ export default function Peer(opts) {
   }
 
   function handleIceCandidate(signal) {
-    const { icecandidate } = signal;
+    const {
+      icecandidate
+    } = signal;
     console.log('received ice candidate', icecandidate);
     if (pc.didSetRemoteDescription) {
       pc.addIceCandidate(new RTCIceCandidate(icecandidate));
@@ -43,27 +50,38 @@ export default function Peer(opts) {
   }
 
   function handleOffer(signal) {
-    const { offer } = signal;
+    const {
+      offer
+    } = signal;
     console.log('received offer', offer);
-
+    if (signal.renegotiating) {
+      renegotiating = true;
+    }
+    if (renegotiating) {
+      pc.removeStream(videoOnlyStream);
+      videoOnlyStream.getTracks().forEach(track => track.stop());
+      videoOnlyStream = null;
+    }
     return new Promise((resolve, reject) => {
-      if (!signal.wantsRemoteVideo) {
-        return resolve();
-      }
-
-      const constraints = { audio: true, video: true };
+      const constraints = {
+        audio: renegotiating ? true : false,
+        video: true
+      };
       getUserMedia(constraints, resolve, reject);
     }).then((stream) => {
       if (!stream) {
         return;
       }
-
+      if (renegotiating) {
+        videoWithAudioStream = stream;
+      } else {
+        videoOnlyStream = stream;
+      }
       attachMediaStream($localVideo, stream);
       pc.addStream(stream);
       $localVideo.play();
     }).then(() => {
       pc.setRemoteDescription(new RTCSessionDescription(offer)).then(() => {
-        didSetRemoteDescription = true;
         drainQueuedCandidates();
 
         pc.createAnswer().then(answer => {
@@ -83,39 +101,68 @@ export default function Peer(opts) {
   }
 
   function handleAnswer(signal) {
-    const { answer } = signal;
+    const {
+      answer
+    } = signal;
     pc.setRemoteDescription(new RTCSessionDescription(answer)).then(() => {
-      didSetRemoteDescription = true;
       drainQueuedCandidates();
-
       console.log('set answer', answer);
     });
   }
 
   function onCreateOfferSuccess(offer) {
-    console.log('calling setLocalDescription in createOfferSuccess');
     pc.setLocalDescription(offer).then(() => {
       socket.emit('signal', {
         type: 'offer',
         from: socket.id,
         to: peerId,
-        wantsRemoteVideo: true,
-        offer
+        offer,
+        renegotiating: renegotiating
       });
       console.trace('sent offer', offer);
     }, errorHandler('setLocalDescription'));
   }
 
   function startVideoCall() {
-    const videoConstraints = { audio: true, video: true };
+    const videoConstraints = {
+      audio: false,
+      video: true
+    };
     getUserMedia(videoConstraints, stream => {
-      videoCallStream = stream;
+      videoOnlyStream = stream;
       attachMediaStream($localVideo, stream);
       $localVideo.play();
       pc.addStream(stream);
+      pc.createOffer(onCreateOfferSuccess, errorHandler('createOffer'));
+    }, console.error.bind(console, 'getUserMedia failed'));
+  }
+
+  function startAudioCall() {
+    const videoWithAudioConstraints = {
+      audio: true,
+      video: true
+    };
+
+    getUserMedia(videoWithAudioConstraints, stream => {
+      pc.removeStream(videoOnlyStream);
+      videoOnlyStream.getTracks().forEach(track => track.stop());
+      videoOnlyStream = null;
+
+      renegotiating = true;
+
+      videoWithAudioStream = stream;
+      attachMediaStream($localVideo, stream);
+      $localVideo.play();
+      pc.addStream(videoWithAudioStream);
       pc.createOffer(onCreateOfferSuccess, errorHandler('renegotiation createOffer'));
     }, console.error.bind(console, 'getUserMedia failed'));
   }
+
+  $toggleAudioButton.onclick = function toggleAudioButtonClick() {
+    // if (!videoWithAudioStream) {
+    startAudioCall();
+    // }
+  };
 
   /**
    * handle ice candidate generation from webrtc peer connection
@@ -127,7 +174,9 @@ export default function Peer(opts) {
       console.log('received end-of-ice signal');
       return;
     }
-
+    if (renegotiating) {
+      return;
+    }
     console.log('onicecandidate', obj.candidate);
     socket.emit('signal', {
       type: 'icecandidate',
@@ -143,23 +192,24 @@ export default function Peer(opts) {
     }
   };
 
-  pc.onnegotiationneeded = () => {
-    if (pc.iceConnectionState === 'connected') {
-      console.log('onnegotiationneeded');
-      pc.createOffer(onCreateOfferSuccess, errorHandler('renegotiation createOffer'));
-    }
-  };
+  // pc.onnegotiationneeded = () => {
+  //   if (pc.iceConnectionState === 'connected') {
+  //     console.log('onnegotiationneeded');
+  //     pc.createOffer(onCreateOfferSuccess, errorHandler('renegotiation createOffer'));
+  //   }
+  // };
 
   pc.onaddstream = obj => {
     const stream = obj.stream;
-    const hasAudioTracks = stream.getAudioTracks().length > 0;
+    const hasVideoTracks = stream.getVideoTracks().length > 0;
     console.log([
       `onaddstream. remote stream has ${stream.getAudioTracks().length} audio tracks`,
-      `and ${stream.getVideoTracks().length} video tracks`].join(' ')
-    );
-    const element = hasAudioTracks ? $remoteVideo : $remoteScreenShare;
-    attachMediaStream(element, stream);
-    element.play();
+      `and ${stream.getVideoTracks().length} video tracks`
+    ].join(' '));
+    if (hasVideoTracks) {
+      attachMediaStream($remoteVideo, stream);
+      $remoteVideo.play();
+    }
   };
 
   socket.on('signal', signal => {
@@ -187,6 +237,7 @@ export default function Peer(opts) {
   return {
     peerId,
     startVideoCall,
-    handleOffer
+    handleOffer,
+    pc
   };
 }
