@@ -1,4 +1,3 @@
-/* global io: false */
 import * as webrtc from 'webrtc-adapter-test';
 import Peer from './peer';
 
@@ -24,6 +23,9 @@ function createControls(socketId) {
   $localVideo.setAttribute('muted', 'true');
   const $localScreenShare = document.createElement('video');
   $localScreenShare.setAttribute('data-type', 'screenShare');
+
+  const $screenshareButton = document.createElement('button');
+  $screenshareButton.appendChild(document.createTextNode('Screenshare'));
 
   const $remoteVideo = document.createElement('video');
   $remoteVideo.setAttribute('data-type', 'video');
@@ -55,7 +57,8 @@ function createControls(socketId) {
     $localVideo,
     $localScreenShare,
     $remoteVideo,
-    $remoteScreenShare
+    $remoteScreenShare,
+    $screenshareButton
   };
 }
 
@@ -80,7 +83,6 @@ socket.on('signal', signal => {
 });
 
 socket.on('join', socketId => {
-
   if (socketId === socket.id) {
     return;
   }
@@ -98,7 +100,7 @@ socket.on('leave', socketId => {
     return;
   }
 
-  var peer = peers.get(socketId);
+  const peer = peers.get(socketId);
   if (peer) {
     peers.delete(socketId);
     removeControls(socketId);
