@@ -1,33 +1,42 @@
+function errorHandler(processName) {
+  return console.error.bind(console, `${processName} failed`);
+}
+
 /**
  *
  * Create a peer
  *
  * @param opts
- * @param opts.socket,
- * @param opts.socketId,
- * @param opts.$localVideo,
- * @param opts.$localScreenShare,
- * @param opts.$remoteVideo,
- * @param opts.$remoteScreenShare
- * @returns {{peerId: *, startVideoCall: startVideoCall}}
+ * @param {object} opts.socket,
+ * @param {string} opts.socketId,
+ * @param {HTMLElement} opts.$localVideo,
+ * @param {HTMLElement} opts.$localScreenShare,
+ * @param {HTMLElement} opts.$remoteVideo,
+ * @param {HTMLElement} opts.$remoteScreenShare
+ * @returns {{
+ *   peerId: string,
+ *   sendVideo: function,
+ *   toggleAudio: function,
+ *   handleOffer: function,
+ *   pc: object
+ * }}
  */
 export default function Peer(opts) {
   const {
     socket,
     $localVideo,
-    $remoteVideo,
-    $toggleAudioButton
+    $remoteVideo
   } = opts;
+
   const peerId = opts.socketId;
-  let renegotiating = false;
   const pc = new RTCPeerConnection();
   const queuedIceCandidates = [];
 
   let videoOnlyStream = null;
   let videoWithAudioStream = null;
 
-  function errorHandler(processName) {
-    return console.error.bind(console, `${processName} failed`);
+  function isConnected() {
+    return videoOnlyStream || videoWithAudioStream;
   }
 
   function drainQueuedCandidates() {
@@ -38,9 +47,7 @@ export default function Peer(opts) {
   }
 
   function handleIceCandidate(signal) {
-    const {
-      icecandidate
-    } = signal;
+    const { icecandidate } = signal;
     console.log('received ice candidate', icecandidate);
     if (pc.didSetRemoteDescription) {
       pc.addIceCandidate(new RTCIceCandidate(icecandidate));
@@ -50,60 +57,49 @@ export default function Peer(opts) {
   }
 
   function handleOffer(signal) {
-    const {
-      offer
-    } = signal;
+    const { offer } = signal;
     console.log('received offer', offer);
-    if (signal.renegotiating) {
-      renegotiating = true;
-    }
-    if (renegotiating) {
-      pc.removeStream(videoOnlyStream);
-      videoOnlyStream.getTracks().forEach(track => track.stop());
-      videoOnlyStream = null;
-    }
-    return new Promise((resolve, reject) => {
-      const constraints = {
-        audio: renegotiating ? true : false,
-        video: true
-      };
-      getUserMedia(constraints, resolve, reject);
-    }).then((stream) => {
-      if (!stream) {
-        return;
-      }
-      if (renegotiating) {
-        videoWithAudioStream = stream;
-      } else {
-        videoOnlyStream = stream;
-      }
-      attachMediaStream($localVideo, stream);
-      pc.addStream(stream);
-      $localVideo.play();
-    }).then(() => {
-      pc.setRemoteDescription(new RTCSessionDescription(offer)).then(() => {
-        drainQueuedCandidates();
 
+    pc.setRemoteDescription(new RTCSessionDescription(offer)).then(() => {
+      drainQueuedCandidates();
+
+      new Promise((resolve, reject) => {
+        if (isConnected()) {
+          return resolve();
+        }
+
+        const constraints = {
+          audio: false,
+          video: true
+        };
+        getUserMedia(constraints, resolve, reject);
+      }).then((stream) => {
+        if (!stream) {
+          return;
+        }
+
+        videoOnlyStream = stream;
+        attachMediaStream($localVideo, stream);
+        pc.addStream(stream);
+        $localVideo.play();
+      }).then(() => {
         pc.createAnswer().then(answer => {
           console.log('calling setLocalDescription after createAnswer');
           pc.setLocalDescription(answer).then(() => {
             socket.emit('signal', {
               type: 'answer',
-              from: socket.id,
               to: peerId,
               answer
             });
             console.log('sent answer', answer);
           }, errorHandler('setLocalDescription'));
         });
-      });
+      }).catch(errorHandler('handleOffer promise'));
     });
   }
 
   function handleAnswer(signal) {
-    const {
-      answer
-    } = signal;
+    const { answer } = signal;
     pc.setRemoteDescription(new RTCSessionDescription(answer)).then(() => {
       drainQueuedCandidates();
       console.log('set answer', answer);
@@ -114,20 +110,25 @@ export default function Peer(opts) {
     pc.setLocalDescription(offer).then(() => {
       socket.emit('signal', {
         type: 'offer',
-        from: socket.id,
         to: peerId,
-        offer,
-        renegotiating: renegotiating
+        offer
       });
       console.trace('sent offer', offer);
     }, errorHandler('setLocalDescription'));
   }
 
-  function startVideoCall() {
+  function sendVideo() {
     const videoConstraints = {
       audio: false,
       video: true
     };
+
+    if (isConnected()) {
+      pc.removeStream(videoWithAudioStream);
+      videoWithAudioStream.getTracks().forEach(track => track.stop());
+      videoWithAudioStream = null;
+    }
+
     getUserMedia(videoConstraints, stream => {
       videoOnlyStream = stream;
       attachMediaStream($localVideo, stream);
@@ -137,7 +138,7 @@ export default function Peer(opts) {
     }, console.error.bind(console, 'getUserMedia failed'));
   }
 
-  function startAudioCall() {
+  function sendVideoAndAudio() {
     const videoWithAudioConstraints = {
       audio: true,
       video: true
@@ -147,9 +148,6 @@ export default function Peer(opts) {
       pc.removeStream(videoOnlyStream);
       videoOnlyStream.getTracks().forEach(track => track.stop());
       videoOnlyStream = null;
-
-      renegotiating = true;
-
       videoWithAudioStream = stream;
       attachMediaStream($localVideo, stream);
       $localVideo.play();
@@ -158,11 +156,13 @@ export default function Peer(opts) {
     }, console.error.bind(console, 'getUserMedia failed'));
   }
 
-  $toggleAudioButton.onclick = function toggleAudioButtonClick() {
-    // if (!videoWithAudioStream) {
-    startAudioCall();
-    // }
-  };
+  function toggleAudio() {
+    if (videoWithAudioStream) {
+      sendVideo();
+    } else {
+      sendVideoAndAudio();
+    }
+  }
 
   /**
    * handle ice candidate generation from webrtc peer connection
@@ -174,13 +174,15 @@ export default function Peer(opts) {
       console.log('received end-of-ice signal');
       return;
     }
-    if (renegotiating) {
+
+    if (isConnected()) {
+      console.log('peer connection already established. discarding ice candidate.', obj);
       return;
     }
+
     console.log('onicecandidate', obj.candidate);
     socket.emit('signal', {
       type: 'icecandidate',
-      from: socket.id,
       to: peerId,
       icecandidate: obj.candidate
     });
@@ -192,20 +194,15 @@ export default function Peer(opts) {
     }
   };
 
-  // pc.onnegotiationneeded = () => {
-  //   if (pc.iceConnectionState === 'connected') {
-  //     console.log('onnegotiationneeded');
-  //     pc.createOffer(onCreateOfferSuccess, errorHandler('renegotiation createOffer'));
-  //   }
-  // };
-
   pc.onaddstream = obj => {
     const stream = obj.stream;
     const hasVideoTracks = stream.getVideoTracks().length > 0;
+
     console.log([
       `onaddstream. remote stream has ${stream.getAudioTracks().length} audio tracks`,
       `and ${stream.getVideoTracks().length} video tracks`
     ].join(' '));
+
     if (hasVideoTracks) {
       attachMediaStream($remoteVideo, stream);
       $remoteVideo.play();
@@ -213,10 +210,6 @@ export default function Peer(opts) {
   };
 
   socket.on('signal', signal => {
-    if (signal.from !== peerId) {
-      return;
-    }
-
     console.log(`received '${signal.type}' signal from ${signal.from} destined for ${signal.to}`);
 
     switch (signal.type) {
@@ -236,7 +229,8 @@ export default function Peer(opts) {
 
   return {
     peerId,
-    startVideoCall,
+    sendVideo,
+    toggleAudio,
     handleOffer,
     pc
   };

@@ -1,7 +1,7 @@
 import path from 'path';
 
 export default {
-  devtool: "source-map",
+  devtool: 'source-map',
   entry: [ './client/app.js' ],
   output: {
     path: path.join(__dirname, 'public'),

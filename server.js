@@ -22,8 +22,9 @@ io.on('connection', (socket) => {
     io.emit('leave', socket.id);
   });
   socket.on('signal', (signal) => {
-    console.log(`received ${signal.type} signal destined for ${signal.to}`);
-    io.emit('signal', signal);
+    console.log(`${socket.id} sending ${signal.type} signal to ${signal.to}`);
+    signal.from = socket.id;
+    io.to(signal.to).emit('signal', signal);
   });
 });
 

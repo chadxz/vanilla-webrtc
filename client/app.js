@@ -62,9 +62,8 @@ socket.on('connect', () => {
 
 socket.on('signal', signal => {
   const isKnownPeer = !!peers.get(signal.from);
-  const isMyself = signal.to !== socket.id;
 
-  if (isKnownPeer || isMyself || (signal.type !== 'offer')) {
+  if (isKnownPeer || (signal.type !== 'offer')) {
     return;
   }
 
@@ -73,6 +72,7 @@ socket.on('signal', signal => {
 
   const peer = new Peer({ socket, socketId: signal.from, ...controls });
   peers.set(signal.from, peer);
+  controls.$toggleAudioButton.onclick = peer.toggleAudio;
   peer.handleOffer(signal);
 });
 
@@ -86,7 +86,8 @@ socket.on('join', socketId => {
 
   const peer = new Peer({ socket, socketId, ...controls });
   peers.set(socketId, peer);
-  peer.startVideoCall();
+  controls.$toggleAudioButton.onclick = peer.toggleAudio;
+  peer.sendVideo();
 });
 
 socket.on('leave', socketId => {
