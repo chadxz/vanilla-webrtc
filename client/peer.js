@@ -106,7 +106,7 @@ export default function Peer(opts) {
       }).then((stream) => {
         if (stream) {
           videoOnlyStream = stream;
-          attachMediaStream($localVideo, stream);
+          $localVideo.srcObject = stream;
           pc.addStream(stream);
           $localVideo.play();
         }
@@ -299,7 +299,7 @@ export default function Peer(opts) {
     ].join(' '));
 
     if (hasVideoTracks) {
-      attachMediaStream($remoteVideo, stream);
+      $remoteVideo.srcObject = stream;
       $remoteVideo.play();
     }
   };
