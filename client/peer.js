@@ -33,20 +33,10 @@ export default function Peer(opts) {
   const pc = new RTCPeerConnection();
   const queuedIceCandidates = [];
 
+  let didSetRemoteDescription = false;
   let videoOnlyStream = null;
   let videoWithAudioStream = null;
-
-  /**
-   * Determine whether we are connected or not. This is not the
-   * best way to determine this, but it works for the purposes of
-   * this simple app.
-   *
-   * @returns {boolean}
-   * @api private
-   */
-  function isConnected() {
-    return !!(videoOnlyStream || videoWithAudioStream);
-  }
+  let isConnected = false;
 
   /**
    * Called after seeing setRemoteDescription, this function
@@ -58,6 +48,7 @@ export default function Peer(opts) {
    * @api private
    */
   function drainQueuedCandidates() {
+    didSetRemoteDescription = true;
     while (queuedIceCandidates.length > 0) {
       pc.addIceCandidate(queuedIceCandidates.shift());
     }
@@ -76,7 +67,7 @@ export default function Peer(opts) {
   function handleIceCandidate(signal) {
     const { icecandidate } = signal;
     console.log('received ice candidate', icecandidate);
-    if (pc.didSetRemoteDescription) {
+    if (didSetRemoteDescription) {
       pc.addIceCandidate(new RTCIceCandidate(icecandidate));
     } else {
       queuedIceCandidates.push(new RTCIceCandidate(icecandidate));
@@ -104,25 +95,22 @@ export default function Peer(opts) {
       drainQueuedCandidates();
 
       new Promise((resolve, reject) => {
-        if (isConnected()) {
+        if (isConnected) {
           return resolve();
         }
 
-        const constraints = {
+        getUserMedia({
           audio: false,
           video: true
-        };
-        getUserMedia(constraints, resolve, reject);
+        }, resolve, reject);
       }).then((stream) => {
-        if (!stream) {
-          return;
+        if (stream) {
+          videoOnlyStream = stream;
+          attachMediaStream($localVideo, stream);
+          pc.addStream(stream);
+          $localVideo.play();
         }
 
-        videoOnlyStream = stream;
-        attachMediaStream($localVideo, stream);
-        pc.addStream(stream);
-        $localVideo.play();
-      }).then(() => {
         pc.createAnswer().then(answer => {
           console.log('calling setLocalDescription after createAnswer');
           pc.setLocalDescription(answer).then(() => {
@@ -186,13 +174,11 @@ export default function Peer(opts) {
    * @api public
    */
   function sendVideo() {
-    const videoConstraints = {
+    getUserMedia({
       audio: false,
       video: true
-    };
-
-    getUserMedia(videoConstraints, stream => {
-      if (isConnected()) {
+    }, stream => {
+      if (isConnected) {
         pc.removeStream(videoWithAudioStream);
         videoWithAudioStream.getTracks().forEach(track => track.stop());
         videoWithAudioStream = null;
@@ -203,7 +189,7 @@ export default function Peer(opts) {
       $localVideo.play();
       pc.addStream(stream);
       pc.createOffer(onCreateOfferSuccess, errorHandler('createOffer'));
-    }, console.error.bind(console, 'getUserMedia failed'));
+    }, errorHandler('getUserMedia'));
   }
 
   /**
@@ -216,13 +202,11 @@ export default function Peer(opts) {
    * @api public
    */
   function sendVideoAndAudio() {
-    const videoWithAudioConstraints = {
+    getUserMedia({
       audio: true,
       video: true
-    };
-
-    getUserMedia(videoWithAudioConstraints, stream => {
-      if (isConnected()) {
+    }, stream => {
+      if (isConnected) {
         pc.removeStream(videoOnlyStream);
         videoOnlyStream.getTracks().forEach(track => track.stop());
         videoOnlyStream = null;
@@ -233,7 +217,7 @@ export default function Peer(opts) {
       $localVideo.play();
       pc.addStream(videoWithAudioStream);
       pc.createOffer(onCreateOfferSuccess, errorHandler('renegotiation createOffer'));
-    }, console.error.bind(console, 'getUserMedia failed'));
+    }, errorHandler('getUserMedia'));
   }
 
   /**
@@ -267,7 +251,7 @@ export default function Peer(opts) {
       return;
     }
 
-    if (isConnected()) {
+    if (isConnected) {
       console.log('peer connection already established. discarding ice candidate.', obj);
       return;
     }
@@ -290,6 +274,7 @@ export default function Peer(opts) {
    */
   pc.oniceconnectionstatechange = () => {
     if (pc.iceConnectionState === 'connected') {
+      isConnected = true;
       console.log('connected.');
     }
   };
