@@ -160,7 +160,7 @@ export default function Peer(opts) {
         to: peerId,
         offer
       });
-      console.trace('sent offer', offer);
+      console.log('sent offer', offer);
     }, errorHandler('setLocalDescription'));
   }
 
