@@ -1,4 +1,5 @@
 import path from 'path';
+import webpack from 'webpack';
 
 export default {
   devtool: 'source-map',
@@ -14,5 +15,12 @@ export default {
       loaders: ['babel'],
       include: path.join(__dirname, 'client')
     }]
-  }
+  },
+  plugins: [
+    new webpack.NoErrorsPlugin(),
+    new webpack.ProvidePlugin({
+      'es6-promise': 'es6-promise',
+      'fetch': 'imports?this=>global!exports?global.fetch!whatwg-fetch'
+    })
+  ]
 };
