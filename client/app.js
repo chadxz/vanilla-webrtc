@@ -6,9 +6,6 @@ Object.keys(webrtc).forEach(key => (
   window[key] = webrtc[key]
 ));
 
-// allow webrtc shim to print to console
-webrtcUtils.log = console.log.bind(console);
-
 const peers = window.peers = new Map();
 const $peers = document.getElementById('peers');
 const socket = io();
@@ -104,6 +101,7 @@ socket.on('signal', signal => {
 
   const peerId = signal.from;
   const controls = createControls(peerId);
+
   const peer = new Peer({
     socket,
     peerId,
@@ -111,7 +109,7 @@ socket.on('signal', signal => {
   });
 
   peers.set(peerId, peer);
-  controls.$toggleAudioButton.onclick = peer.toggleAudio;
+  controls.$toggleAudioButton.onclick = peer.share;
   peer.handleOffer(signal);
 });
 
@@ -122,7 +120,7 @@ socket.on('signal', signal => {
  * initiate the call, albeit kind of annoying for testing.
  */
 socket.on('join', peerId => {
-  // the server sends our own join event to ourself, so just ignore it.
+  // the server sends our own join event to ourself, so just ignore it
   if (peerId === socket.id) {
     return;
   }
@@ -130,6 +128,7 @@ socket.on('join', peerId => {
   console.log(`${peerId} joined. calling.`);
 
   const controls = createControls(peerId);
+
   const peer = new Peer({
     socket,
     peerId,
@@ -137,8 +136,8 @@ socket.on('join', peerId => {
   });
 
   peers.set(peerId, peer);
-  controls.$toggleAudioButton.onclick = peer.toggleAudio;
-  peer.sendVideo();
+  controls.$toggleAudioButton.onclick = peer.share;
+  peer.share();
 });
 
 /**
@@ -147,6 +146,7 @@ socket.on('join', peerId => {
  * We cleanup any peer connections & ui associated with that socket.
  */
 socket.on('leave', socketId => {
+  // the server sends our own leave event to ourself, so just ignore it
   if (socketId === socket.id) {
     return;
   }
