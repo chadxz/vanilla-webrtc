@@ -6,8 +6,16 @@ import SocketIO from 'socket.io';
 import webpack from 'webpack';
 import webpackMiddleware from 'webpack-dev-middleware';
 import webpackConfig from './webpack.config.babel';
-import request from 'request';
+import axios from 'axios';
 import config from 'config';
+
+const googleStunServers = [
+  { url: 'stun:stun.l.google.com:19302' },
+  { url: 'stun:stun1.l.google.com:19302' },
+  { url: 'stun:stun2.l.google.com:19302' },
+  { url: 'stun:stun3.l.google.com:19302' },
+  { url: 'stun:stun4.l.google.com:19302' }
+];
 
 const respokeAppSecret = config.has('respoke.appSecret') ?
   config.get('respoke.appSecret') : null;
@@ -39,40 +47,34 @@ io.on('connection', (socket) => {
   });
 
   socket.on('need-turn-servers', (callback) => {
-    if (!respokeAppSecret) {
-      callback([]);
-      return;
-    }
-
-    request.get({
-      url: `https://api.respoke.io/v1/turn?endpointId=${socket.id}`,
-      json: true,
-      headers: {
-        'App-Secret': respokeAppSecret
-      }
-    }, (err, response, body) => {
-      if (err) {
-        console.error('Error retrieving respoke turn servers', err);
-        callback([]);
-        return;
+    Promise.resolve().then(() => {
+      if (!respokeAppSecret) {
+        return [];
       }
 
-      if (!body.uris || !Array.isArray(body.uris)) {
-        console.error('No respoke turn servers available', body);
-        callback([]);
-        return;
-      }
+      return axios.get(`https://api.respoke.io/v1/turn?endpointId=${socket.id}`, {
+        headers: { 'App-Secret': respokeAppSecret }
+      }).then((response) => {
+        if (!response.data.uris || !Array.isArray(response.data.uris)) {
+          console.error('No respoke turn servers available', response.data);
+          return [];
+        }
 
-      const servers = body.uris.map(uri => {
-        return {
-          url: uri,
-          username: body.username,
-          credential: body.password
-        };
+        return response.data.uris.map(uri => {
+          return {
+            url: uri,
+            username: body.username,
+            credential: body.password
+          };
+        });
       });
-
-      console.log('Sending respoke turn servers', servers);
+    }).then((respokeServers) => {
+      const servers = [ ...googleStunServers, ...respokeServers ];
+      console.log('Sending STUN/TURN servers', servers);
       callback(servers);
+    }).catch((err) => {
+      console.error('Error retrieving respoke turn servers', err);
+      callback([]);
     });
   });
 });

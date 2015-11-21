@@ -38,10 +38,15 @@ export default function Peer(opts) {
   const turnServerPromise = retrieveTurnServers(socket);
 
   let pc = null;
-  let didSetRemoteDescription = false;
-  let videoOnlyStream = null;
-  let videoWithAudioStream = null;
   let isConnected = false;
+  let didSetRemoteDescription = false;
+
+  function removeLocalStreams() {
+    pc.getLocalStreams().forEach(stream => {
+      stream.getTracks().forEach(track => track.stop());
+      pc.removeStream(stream);
+    });
+  }
 
   function createPeerConnection() {
     return turnServerPromise.then(turnServers => {
@@ -118,6 +123,35 @@ export default function Peer(opts) {
     });
   }
 
+  function shareMedia(constraints) {
+    return Promise.resolve().then(() => {
+      if (pc) {
+        return;
+      }
+
+      return createPeerConnection();
+    }).then(() => {
+      return getUserMedia(constraints);
+    }).then(stream => {
+      removeLocalStreams();
+      $localVideo.srcObject = stream;
+      $localVideo.play();
+      pc.addStream(stream);
+
+      isConnected = false;
+      return pc.createOffer();
+    }).then(offer => {
+      return pc.setLocalDescription(offer).then(() => {
+        socket.emit('signal', {
+          type: 'offer',
+          to: peerId,
+          offer
+        });
+        console.log('sent offer', offer);
+      });
+    }).catch(errorHandler('sendVideo'));
+  }
+
   /**
    * Called after seeing setRemoteDescription, this function
    * adds any queued iceCandidates to the peer connection. It
@@ -127,9 +161,9 @@ export default function Peer(opts) {
    * is ready to process them.
    * @api private
    */
-  function drainQueuedCandidates() {
+  function processQueuedCandidates() {
     didSetRemoteDescription = true;
-    while (queuedIceCandidates.length > 0) {
+    while (queuedIceCandidates.length) {
       pc.addIceCandidate(queuedIceCandidates.shift());
     }
     console.log('processed all queued ice candidates');
@@ -174,7 +208,7 @@ export default function Peer(opts) {
     createPeerConnection().then(() => {
       return pc.setRemoteDescription(new RTCSessionDescription(offer));
     }).then(() => {
-      drainQueuedCandidates();
+      processQueuedCandidates();
 
       if (isConnected) {
         return;
@@ -183,7 +217,6 @@ export default function Peer(opts) {
       return getUserMedia({ audio: false, video: true });
     }).then((stream) => {
       if (stream) {
-        videoOnlyStream = stream;
         $localVideo.srcObject = stream;
         pc.addStream(stream);
         $localVideo.play();
@@ -191,8 +224,6 @@ export default function Peer(opts) {
 
       return pc.createAnswer();
     }).then(answer => {
-      console.log('calling setLocalDescription after createAnswer');
-
       return pc.setLocalDescription(answer).then(() => {
         socket.emit('signal', {
           type: 'answer',
@@ -220,93 +251,9 @@ export default function Peer(opts) {
     const { answer } = signal;
     console.log('setting answer', answer);
     pc.setRemoteDescription(new RTCSessionDescription(answer)).then(() => {
-      drainQueuedCandidates();
+      processQueuedCandidates();
       console.log('set answer', answer);
     }).catch(errorHandler('handleAnswer'));
-  }
-
-  /**
-   * Handler responsible for transmitting a successfully generated
-   * offer to the remote peer.
-   *
-   * @param {object} offer
-   * @api private
-   */
-  function onCreateOfferSuccess(offer) {
-    return pc.setLocalDescription(offer).then(() => {
-      socket.emit('signal', {
-        type: 'offer',
-        to: peerId,
-        offer
-      });
-      console.log('sent offer', offer);
-    });
-  }
-
-  /**
-   * Starts a new WebRTC video-only media session with the
-   * remote socketId specified when constructing this Peer.
-   * If called and the peer connection is already established,
-   * this method will renegotiate from an audio/video session
-   * back to a video-only session.
-   *
-   * @api public
-   */
-  function sendVideo() {
-    return Promise.resolve().then(() => {
-      if (pc) {
-        return;
-      }
-
-      return createPeerConnection();
-    }).then(() => {
-      return getUserMedia({ audio: false, video: true });
-    }).then(stream => {
-      if (isConnected) {
-        pc.removeStream(videoWithAudioStream);
-        videoWithAudioStream.getTracks().forEach(track => track.stop());
-        videoWithAudioStream = null;
-      }
-
-      videoOnlyStream = stream;
-      $localVideo.srcObject = stream;
-      $localVideo.play();
-      pc.addStream(stream);
-      return pc.createOffer().then(onCreateOfferSuccess);
-    }).catch(errorHandler('sendVideo'));
-  }
-
-  /**
-   * Starts a new WebRTC audio/video media session with the
-   * remote socketId specified when constructing this Peer.
-   * If called and the peer connection is already established,
-   * this method will renegotiate from an video-only session
-   * to an audio/video session.
-   *
-   * @api public
-   */
-  function sendVideoAndAudio() {
-    return Promise.resolve().then(() => {
-      if (pc) {
-        return;
-      }
-
-      return createPeerConnection();
-    }).then(() => {
-      return getUserMedia({ audio: true, video: true });
-    }).then(stream => {
-      if (isConnected) {
-        pc.removeStream(videoOnlyStream);
-        videoOnlyStream.getTracks().forEach(track => track.stop());
-        videoOnlyStream = null;
-      }
-
-      videoWithAudioStream = stream;
-      $localVideo.srcObject = stream;
-      $localVideo.play();
-      pc.addStream(videoWithAudioStream);
-      return pc.createOffer().then(onCreateOfferSuccess);
-    }).catch(errorHandler('sendVideoAndAudio'));
   }
 
   /**
@@ -315,11 +262,16 @@ export default function Peer(opts) {
    *
    * @api public
    */
-  function toggleAudio() {
-    if (videoWithAudioStream) {
-      sendVideo();
+  function share() {
+    const videoOnlyConstraints = { audio: false, video: true };
+    const audioAndVideoConstraints = { audio: true, video: true };
+    const alreadySendingStream = !!(pc && pc.getLocalStreams().length);
+    const alreadySendingAudio = !!(pc && pc.getLocalStreams()[0].getAudioTracks().length);
+
+    if (!alreadySendingStream || alreadySendingAudio) {
+      shareMedia(videoOnlyConstraints);
     } else {
-      sendVideoAndAudio();
+      shareMedia(audioAndVideoConstraints);
     }
   }
 
@@ -349,8 +301,7 @@ export default function Peer(opts) {
 
   return {
     peerId,
-    sendVideo,
-    toggleAudio,
+    share,
     handleOffer,
     get pc() {
       return pc;
