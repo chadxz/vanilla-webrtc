@@ -19,8 +19,7 @@ export default {
   plugins: [
     new webpack.NoErrorsPlugin(),
     new webpack.ProvidePlugin({
-      'es6-promise': 'es6-promise',
-      'fetch': 'imports?this=>global!exports?global.fetch!whatwg-fetch'
+      'es6-promise': 'es6-promise'
     })
   ]
 };

@@ -153,6 +153,7 @@ socket.on('leave', socketId => {
 
   const peer = peers.get(socketId);
   if (peer) {
+    peer.end();
     peers.delete(socketId);
     removeControls(socketId);
   }

@@ -63,8 +63,8 @@ io.on('connection', (socket) => {
         return response.data.uris.map(uri => {
           return {
             url: uri,
-            username: body.username,
-            credential: body.password
+            username: response.data.username,
+            credential: response.data.password
           };
         });
       });

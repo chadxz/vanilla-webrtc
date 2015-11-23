@@ -48,8 +48,13 @@ export default function Peer(opts) {
     });
   }
 
-  function createPeerConnection() {
+  function ensurePeerConnection() {
+    if (pc) {
+      return Promise.resolve();
+    }
+
     return turnServerPromise.then(turnServers => {
+      console.log('Creating peer with options', { iceServers: turnServers });
       pc = new RTCPeerConnection({ iceServers: turnServers });
 
       /**
@@ -124,13 +129,7 @@ export default function Peer(opts) {
   }
 
   function shareMedia(constraints) {
-    return Promise.resolve().then(() => {
-      if (pc) {
-        return;
-      }
-
-      return createPeerConnection();
-    }).then(() => {
+    ensurePeerConnection().then(() => {
       return getUserMedia(constraints);
     }).then(stream => {
       removeLocalStreams();
@@ -138,7 +137,6 @@ export default function Peer(opts) {
       $localVideo.play();
       pc.addStream(stream);
 
-      isConnected = false;
       return pc.createOffer();
     }).then(offer => {
       return pc.setLocalDescription(offer).then(() => {
@@ -205,7 +203,7 @@ export default function Peer(opts) {
     const { offer } = signal;
     console.log('received offer', offer);
 
-    createPeerConnection().then(() => {
+    ensurePeerConnection().then(() => {
       return pc.setRemoteDescription(new RTCSessionDescription(offer));
     }).then(() => {
       processQueuedCandidates();
@@ -257,6 +255,32 @@ export default function Peer(opts) {
   }
 
   /**
+   * socket.io handler for a received 'signal' pubsub event.
+   *
+   * The signal's `from` property is set by the server, indicating
+   * the originating socketId of the offer.
+   *
+   * @api private
+   */
+  function handleSignal(signal) {
+    console.log(`received an '${signal.type}' signal from socketId '${signal.from}'`);
+
+    switch (signal.type) {
+    case 'icecandidate':
+      handleIceCandidate(signal);
+      break;
+    case 'offer':
+      handleOffer(signal);
+      break;
+    case 'answer':
+      handleAnswer(signal);
+      break;
+    default:
+      console.log('I have no idea what to do with this signal', signal);
+    }
+  }
+
+  /**
    * Toggles the media session on the peer connection
    * from an audio/video to video-only and back again.
    *
@@ -276,33 +300,27 @@ export default function Peer(opts) {
   }
 
   /**
-   * socket.io handler for a received 'signal' pubsub event.
+   * Close a peer connection, and remove associated socket.io event listeners
    *
-   * The signal's `from` property is set by the server, indicating
-   * the originating socketId of the offer.
+   * @api public
    */
-  socket.on('signal', signal => {
-    console.log(`received an '${signal.type}' signal from socketId '${signal.from}'`);
-
-    switch (signal.type) {
-    case 'icecandidate':
-      handleIceCandidate(signal);
-      break;
-    case 'offer':
-      handleOffer(signal);
-      break;
-    case 'answer':
-      handleAnswer(signal);
-      break;
-    default:
-      console.log('I have no idea what to do with this signal', signal);
+  function end() {
+    if (pc) {
+      removeLocalStreams();
+      socket.removeListener('signal', handleSignal);
     }
-  });
+  }
+
+  /**
+   * Register an event listener for any signals coming over the socket
+   */
+  socket.on('signal', handleSignal);
 
   return {
     peerId,
     share,
     handleOffer,
+    end,
     get pc() {
       return pc;
     }

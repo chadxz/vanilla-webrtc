@@ -25,6 +25,7 @@
     "babel-preset-react": "^6.1.18",
     "babel-preset-stage-2": "^6.1.18",
     "config": "^1.17.1",
+    "es6-promise": "^3.0.2",
     "eslint": "^1.9.0",
     "eslint-config-airbnb": "^1.0.0",
     "eslint-plugin-react": "^3.9.0",
