@@ -212,14 +212,15 @@ export default function Peer(opts) {
         return;
       }
 
-      return getUserMedia({ audio: false, video: true });
-    }).then((stream) => {
-      if (stream) {
+      return getUserMedia({
+        audio: false,
+        video: true
+      }).then(stream => {
         $localVideo.srcObject = stream;
         pc.addStream(stream);
         $localVideo.play();
-      }
-
+      });
+    }).then(() => {
       return pc.createAnswer();
     }).then(answer => {
       return pc.setLocalDescription(answer).then(() => {
@@ -307,8 +308,9 @@ export default function Peer(opts) {
   function end() {
     if (pc) {
       removeLocalStreams();
-      socket.removeListener('signal', handleSignal);
     }
+
+    socket.removeListener('signal', handleSignal);
   }
 
   /**
