@@ -33,7 +33,7 @@ export default function Peer(opts) {
     $remoteVideo
   } = opts;
 
-  const getUserMedia = navigator.mediaDevices.getUserMedia;
+  const getUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
   const queuedIceCandidates = [];
   const turnServerPromise = retrieveTurnServers(socket);
 
@@ -116,8 +116,8 @@ export default function Peer(opts) {
         const hasVideoTracks = stream.getVideoTracks().length > 0;
 
         console.log([
-          `onaddstream. remote stream has ${stream.getAudioTracks().length} audio tracks`,
-          `and ${stream.getVideoTracks().length} video tracks`
+          `onaddstream. remote stream has ${stream.getVideoTracks().length} video tracks`,
+          `and ${stream.getAudioTracks().length} audio tracks`
         ].join(' '));
 
         if (hasVideoTracks) {
@@ -136,6 +136,11 @@ export default function Peer(opts) {
       $localVideo.srcObject = stream;
       $localVideo.play();
       pc.addStream(stream);
+
+      console.log([
+        `creating new offer with ${stream.getVideoTracks().length} video tracks`,
+        `and ${stream.getAudioTracks().length} audio tracks`
+      ].join(' '));
 
       return pc.createOffer();
     }).then(offer => {
