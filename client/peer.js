@@ -1,3 +1,4 @@
+/* global webrtcDetectedBrowser: false */
 import { retrieveTurnServers } from './turn';
 
 function errorHandler(processName) {
@@ -41,11 +42,27 @@ export default function Peer(opts) {
   let isConnected = false;
   let didSetRemoteDescription = false;
 
-  function removeLocalStreams() {
-    pc.getLocalStreams().forEach(stream => {
-      stream.getTracks().forEach(track => track.stop());
-      pc.removeStream(stream);
-    });
+  function removeLocalTracks() {
+    if (webrtcDetectedBrowser === 'firefox') {
+      pc.getSenders().forEach(sender => {
+        pc.removeTrack(sender);
+      });
+    } else if (webrtcDetectedBrowser === 'chrome') {
+      pc.getLocalStreams().forEach(stream => {
+        stream.getTracks().forEach(track => track.stop());
+        pc.removeStream(stream);
+      });
+    }
+  }
+
+  function addLocalTracksFromStream(stream) {
+    if (webrtcDetectedBrowser === 'firefox') {
+      stream.getTracks().forEach(track => {
+        pc.addTrack(track, stream);
+      });
+    } else if (webrtcDetectedBrowser === 'chrome') {
+      pc.addStream(stream);
+    }
   }
 
   function ensurePeerConnection() {
@@ -132,10 +149,10 @@ export default function Peer(opts) {
     ensurePeerConnection().then(() => {
       return getUserMedia(constraints);
     }).then(stream => {
-      removeLocalStreams();
+      removeLocalTracks();
+      addLocalTracksFromStream(stream);
       $localVideo.srcObject = stream;
       $localVideo.play();
-      pc.addStream(stream);
 
       console.log([
         `creating new offer with ${stream.getVideoTracks().length} video tracks`,
@@ -165,11 +182,19 @@ export default function Peer(opts) {
    * @api private
    */
   function processQueuedCandidates() {
-    didSetRemoteDescription = true;
+    if (!queuedIceCandidates.length) {
+      return;
+    }
+
+    console.log(`adding ${queuedIceCandidates.length} queued candidates to the peer connection`);
+
+    let processedCandidatesCount = 0;
     while (queuedIceCandidates.length) {
       pc.addIceCandidate(queuedIceCandidates.shift());
+      processedCandidatesCount++;
     }
-    console.log('processed all queued ice candidates');
+
+    console.log(`added ${processedCandidatesCount} queued ice candidates to the peer connection`);
   }
 
   /**
@@ -211,6 +236,7 @@ export default function Peer(opts) {
     ensurePeerConnection().then(() => {
       return pc.setRemoteDescription(new RTCSessionDescription(offer));
     }).then(() => {
+      didSetRemoteDescription = true;
       processQueuedCandidates();
 
       if (isConnected) {
@@ -218,11 +244,11 @@ export default function Peer(opts) {
       }
 
       return getUserMedia({
-        audio: false,
+        audio: true,
         video: true
       }).then(stream => {
+        addLocalTracksFromStream(stream);
         $localVideo.srcObject = stream;
-        pc.addStream(stream);
         $localVideo.play();
       });
     }).then(() => {
@@ -255,6 +281,7 @@ export default function Peer(opts) {
     const { answer } = signal;
     console.log('setting answer', answer);
     pc.setRemoteDescription(new RTCSessionDescription(answer)).then(() => {
+      didSetRemoteDescription = true;
       processQueuedCandidates();
       console.log('set answer', answer);
     }).catch(errorHandler('handleAnswer'));
@@ -296,12 +323,12 @@ export default function Peer(opts) {
     const videoOnlyConstraints = { audio: false, video: true };
     const audioAndVideoConstraints = { audio: true, video: true };
     const alreadySendingStream = !!(pc && pc.getLocalStreams().length);
-    const alreadySendingAudio = !!(pc && pc.getLocalStreams()[0].getAudioTracks().length);
+    const notSendingAudio = !(pc && pc.getLocalStreams()[0].getAudioTracks().length);
 
-    if (!alreadySendingStream || alreadySendingAudio) {
-      shareMedia(videoOnlyConstraints);
-    } else {
+    if (!alreadySendingStream || notSendingAudio) {
       shareMedia(audioAndVideoConstraints);
+    } else {
+      shareMedia(videoOnlyConstraints);
     }
   }
 
@@ -312,7 +339,7 @@ export default function Peer(opts) {
    */
   function end() {
     if (pc) {
-      removeLocalStreams();
+      removeLocalTracks();
     }
 
     socket.removeListener('signal', handleSignal);
