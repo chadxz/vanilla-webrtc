@@ -65,6 +65,12 @@ export default function Peer(opts) {
     }
   }
 
+  function isCaller() {
+    return !pc.localDescription ||
+      !pc.localDescription.type ||
+      pc.localDescription.type === 'offer';
+  }
+
   function ensurePeerConnection() {
     if (pc) {
       return Promise.resolve();
@@ -159,16 +165,32 @@ export default function Peer(opts) {
         `and ${stream.getAudioTracks().length} audio tracks`
       ].join(' '));
 
-      return pc.createOffer();
-    }).then(offer => {
-      return pc.setLocalDescription(offer).then(() => {
-        socket.emit('signal', {
-          type: 'offer',
-          to: peerId,
-          offer
+
+      if (isCaller()) {
+        return pc.createOffer().then(offer => {
+          return pc.setLocalDescription(offer).then(() => {
+            socket.emit('signal', {
+              type: 'offer',
+              to: peerId,
+              offer
+            });
+            console.log('sent offer', offer);
+          });
         });
-        console.log('sent offer', offer);
-      });
+      } else {
+        return pc.setRemoteDescription(pc.remoteDescription).then(() => {
+          return pc.createAnswer().then(answer => {
+            return pc.setLocalDescription(answer).then(() => {
+              socket.emit('signal', {
+                type: 'answer',
+                to: peerId,
+                answer
+              });
+              console.log('sent new answer', answer);
+            });
+          });
+        });
+      }
     }).catch(errorHandler('sendVideo'));
   }
 
@@ -279,8 +301,19 @@ export default function Peer(opts) {
    */
   function handleAnswer(signal) {
     const { answer } = signal;
-    console.log('setting answer', answer);
-    pc.setRemoteDescription(new RTCSessionDescription(answer)).then(() => {
+    const sd = new RTCSessionDescription(answer);
+
+    Promise.resolve().then(() => {
+      if (pc.signalingState === 'have-local-offer') {
+        return;
+      }
+
+      console.log('received renegotiation answer');
+      return pc.setLocalDescription(pc.localDescription);
+    }).then(() => {
+      console.log('setting answer', answer);
+      return pc.setRemoteDescription(sd);
+    }).then(() => {
       didSetRemoteDescription = true;
       processQueuedCandidates();
       console.log('set answer', answer);
