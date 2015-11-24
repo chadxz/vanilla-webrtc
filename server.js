@@ -9,13 +9,15 @@ import webpackConfig from './webpack.config.babel';
 import axios from 'axios';
 import config from 'config';
 
-const googleStunServers = [
-  { url: 'stun:stun.l.google.com:19302' },
-  { url: 'stun:stun1.l.google.com:19302' },
-  { url: 'stun:stun2.l.google.com:19302' },
-  { url: 'stun:stun3.l.google.com:19302' },
-  { url: 'stun:stun4.l.google.com:19302' }
-];
+const googleStunServers = {
+  urls: [
+    'stun:stun.l.google.com:19302',
+    'stun:stun1.l.google.com:19302',
+    'stun:stun2.l.google.com:19302',
+    'stun:stun3.l.google.com:19302',
+    'stun:stun4.l.google.com:19302'
+  ]
+};
 
 const respokeAppSecret = config.has('respoke.appSecret') ?
   config.get('respoke.appSecret') : null;
@@ -60,16 +62,14 @@ io.on('connection', (socket) => {
           return [];
         }
 
-        return response.data.uris.map(uri => {
-          return {
-            url: uri,
-            username: response.data.username,
-            credential: response.data.password
-          };
-        });
+        return {
+          urls: response.data.uris,
+          username: response.data.username,
+          credential: response.data.password
+        };
       });
     }).then((respokeServers) => {
-      const servers = [ ...googleStunServers, ...respokeServers ];
+      const servers = [ googleStunServers, respokeServers ];
       console.log('Sending STUN/TURN servers', servers);
       callback(servers);
     }).catch((err) => {
