@@ -49,9 +49,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on('need-turn-servers', (callback) => {
+    const servers = [ googleStunServers ];
     Promise.resolve().then(() => {
       if (!respokeAppSecret) {
-        return [];
+        return;
       }
 
       return axios.get(`https://api.respoke.io/v1/turn?endpointId=${socket.id}`, {
@@ -59,7 +60,7 @@ io.on('connection', (socket) => {
       }).then((response) => {
         if (!response.data.uris || !Array.isArray(response.data.uris)) {
           console.error('No respoke turn servers available', response.data);
-          return [];
+          return;
         }
 
         return {
@@ -69,12 +70,14 @@ io.on('connection', (socket) => {
         };
       });
     }).then((respokeServers) => {
-      const servers = [ googleStunServers, respokeServers ];
+      if (respokeServers) {
+        servers.push(respokeServers);
+      }
       console.log('Sending STUN/TURN servers', servers);
       callback(servers);
     }).catch((err) => {
       console.error('Error retrieving respoke turn servers', err);
-      callback([]);
+      callback(servers);
     });
   });
 });
