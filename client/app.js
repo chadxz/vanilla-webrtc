@@ -49,13 +49,9 @@ function createControls(peerId) {
 
   const $localControls = document.createElement('div');
   $localControls.className = 'local';
-  $localControls.appendChild($localVideo);
-  $localControls.appendChild($toggleAudioButton);
-  $localControls.appendChild($toggleVideoButton);
 
   const $remoteControls = document.createElement('div');
   $remoteControls.className = 'remote';
-  $remoteControls.appendChild($remoteVideo);
 
   const $localControlHeader = document.createElement('input');
   $localControlHeader.setAttribute('readonly', 'readonly');
@@ -72,7 +68,13 @@ function createControls(peerId) {
   $controls.appendChild($remoteControls);
 
   $localControls.appendChild($localControlHeader);
+  $localControls.appendChild($localVideo);
+  $localControls.appendChild($toggleAudioButton);
+  $localControls.appendChild($toggleVideoButton);
+
   $remoteControls.appendChild($remoteControlHeader);
+  $remoteControls.appendChild($remoteVideo);
+
   $peers.appendChild($controls);
 
   return {

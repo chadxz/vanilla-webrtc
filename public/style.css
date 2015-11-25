@@ -2,34 +2,51 @@ html, body {
   background: #eee;
   font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
   padding: 21px;
+  text-align: center;
 }
 
 input {
   border: #ddd;
-  padding: 8px;
-  font-size: 21px;
+  padding: 8px 0;
+  background: #eee;
+  font-size: 13px;
   font-weight: 300;
-  width: 337px;
+  margin: 0;
+  width: 100%;
+  text-align: center;
 }
 
 button {
   padding: 8px;
-  font-size: 13px;
-  font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+  font-size: 8px;
+  background: black;
+  opacity: .8;
+  color: white;
+  border: none;
+  font-weight: 600;
 }
 
 video {
-  width: 100%;
+  max-width: 100%;
+  display: block;
+
 }
 
 .peer {
   display: flex;
+  width: 100%;
+}
+
+.local,
+.remote {
+    padding: 8px;
 }
 
 .local {
-  border: 3px solid red;
+  border: 8px solid rgba(0, 0, 123, .3);
+  border-right: none;
 }
 
 .remote {
-  border: 3px solid purple;
+  border: 8px solid rgba(255, 149, 0, .3);
 }
