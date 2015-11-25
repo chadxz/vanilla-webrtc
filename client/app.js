@@ -27,7 +27,8 @@ function removeControls(socketId) {
  * @returns {{
  *   $localVideo: HTMLElement,
  *   $remoteVideo: HTMLElement,
- *   $toggleAudioButton: HTMLElement
+ *   $toggleAudioButton: HTMLElement,
+ *   $toggleVideoButton: HTMLElement
  * }}
  */
 function createControls(peerId) {
@@ -39,6 +40,9 @@ function createControls(peerId) {
   const $toggleAudioButton = document.createElement('button');
   $toggleAudioButton.appendChild(document.createTextNode('Toggle audio'));
 
+  const $toggleVideoButton = document.createElement('button');
+  $toggleVideoButton.appendChild(document.createTextNode('Toggle video'));
+
   const $remoteVideo = document.createElement('video');
   $remoteVideo.setAttribute('data-type', 'video');
   $remoteVideo.setAttribute('controls', 'true');
@@ -47,6 +51,7 @@ function createControls(peerId) {
   $localControls.className = 'local';
   $localControls.appendChild($localVideo);
   $localControls.appendChild($toggleAudioButton);
+  $localControls.appendChild($toggleVideoButton);
 
   const $remoteControls = document.createElement('div');
   $remoteControls.className = 'remote';
@@ -66,7 +71,8 @@ function createControls(peerId) {
   return {
     $localVideo,
     $remoteVideo,
-    $toggleAudioButton
+    $toggleAudioButton,
+    $toggleVideoButton
   };
 }
 
@@ -111,7 +117,8 @@ socket.on('signal', signal => {
   });
 
   peers.set(peerId, peer);
-  controls.$toggleAudioButton.onclick = peer.share;
+  controls.$toggleAudioButton.onclick = peer.toggleAudio;
+  controls.$toggleVideoButton.onclick = peer.toggleVideo;
   peer.handleOffer(signal);
 });
 
@@ -138,7 +145,8 @@ socket.on('join', peerId => {
   });
 
   peers.set(peerId, peer);
-  controls.$toggleAudioButton.onclick = peer.share;
+  controls.$toggleAudioButton.onclick = peer.toggleAudio;
+  controls.$toggleVideoButton.onclick = peer.toggleVideo;
   peer.share();
 });
 
