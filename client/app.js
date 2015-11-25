@@ -34,12 +34,14 @@ function createControls(peerId) {
   const $localVideo = document.createElement('video');
   $localVideo.setAttribute('data-type', 'video');
   $localVideo.setAttribute('muted', 'true');
+  $localVideo.setAttribute('controls', 'true');
 
   const $toggleAudioButton = document.createElement('button');
   $toggleAudioButton.appendChild(document.createTextNode('Toggle audio'));
 
   const $remoteVideo = document.createElement('video');
   $remoteVideo.setAttribute('data-type', 'video');
+  $remoteVideo.setAttribute('controls', 'true');
 
   const $localControls = document.createElement('div');
   $localControls.className = 'local';

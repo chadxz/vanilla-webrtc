@@ -20,9 +20,9 @@ function errorHandler(processName) {
  * @param {HTMLElement} opts.$remoteScreenShare
  * @returns {{
  *   peerId: string,
- *   sendVideo: function,
- *   toggleAudio: function,
+ *   share: function,
  *   handleOffer: function,
+ *   end: function,
  *   pc: object
  * }}
  */
@@ -254,6 +254,7 @@ export default function Peer(opts) {
     }).then(() => {
       return pc.createAnswer();
     }).then(answer => {
+      console.log('created answer', answer);
       return pc.setLocalDescription(answer).then(() => {
         socket.emit('signal', {
           type: 'answer',
