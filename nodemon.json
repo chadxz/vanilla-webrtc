@@ -1,4 +1,4 @@
 {
   "ext": "js,json",
-  "ignore": ["public", "client"]
+  "ignore": ["public", "client", "node_modules"]
 }
