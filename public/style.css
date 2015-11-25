@@ -1,5 +1,29 @@
+html, body {
+  background: #eee;
+  font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+  padding: 21px;
+}
+
+input {
+  border: #ddd;
+  padding: 8px;
+  font-size: 21px;
+  font-weight: 300;
+  width: 337px;
+}
+
+button {
+  padding: 8px;
+  font-size: 13px;
+  font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+}
+
 video {
-  width: 200px;
+  width: 100%;
+}
+
+.peer {
+  display: flex;
 }
 
 .local {

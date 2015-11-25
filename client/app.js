@@ -57,15 +57,22 @@ function createControls(peerId) {
   $remoteControls.className = 'remote';
   $remoteControls.appendChild($remoteVideo);
 
-  const $controlHeader = document.createElement('h1');
-  $controlHeader.appendChild(document.createTextNode(peerId));
+  const $localControlHeader = document.createElement('input');
+  $localControlHeader.setAttribute('readonly', 'readonly');
+  $localControlHeader.value = socket.id;
+
+  const $remoteControlHeader = document.createElement('input');
+  $remoteControlHeader.setAttribute('readonly', 'readonly');
+  $remoteControlHeader.value = peerId;
 
   const $controls = document.createElement('div');
   $controls.setAttribute('id', peerId);
-  $controls.appendChild($controlHeader);
+  $controls.className = 'peer';
   $controls.appendChild($localControls);
   $controls.appendChild($remoteControls);
 
+  $localControls.appendChild($localControlHeader);
+  $remoteControls.appendChild($remoteControlHeader);
   $peers.appendChild($controls);
 
   return {
