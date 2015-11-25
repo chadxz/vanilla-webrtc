@@ -337,6 +337,7 @@ export default function Peer(opts) {
   }
 
   function toggleVideo() {
+    console.log(`video is ${alreadySendingVideo() ? 'on' : 'off'}, toggling.`);
     shareMedia({ audio: alreadySendingAudio(), video: !alreadySendingVideo() });
   }
 
