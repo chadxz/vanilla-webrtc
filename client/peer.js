@@ -83,12 +83,12 @@ export default function Peer(opts) {
        * of initially connecting, and suppressed if the remote peer
        * connection is already connected.
        *
-       * @param {object} obj
-       * @param {object} obj.candidate The ice candidate
+       * @param {object} evt
+       * @param {object} evt.candidate The ice candidate
        * @api private
        */
-      pc.onicecandidate = (obj) => {
-        if (!obj.candidate) {
+      pc.onicecandidate = (evt) => {
+        if (!evt.candidate) {
           // end of ice signal
           return;
         }
@@ -97,11 +97,11 @@ export default function Peer(opts) {
           return;
         }
 
-        console.log('onicecandidate', obj.candidate);
+        console.log('onicecandidate', evt.candidate);
         socket.emit('signal', {
           type: 'icecandidate',
           to: peerId,
-          icecandidate: obj.candidate
+          icecandidate: evt.candidate
         });
       };
 
@@ -127,11 +127,27 @@ export default function Peer(opts) {
        * stream. An audio stream will for some reason just magically
        * start playing without us needing to attach it to an HTML5 audio element.
        *
-       * @param {object} obj
-       * @param {object} obj.stream the new stream
+       * @param {object} evt
+       * @param {object} evt.stream the new stream
        */
-      pc.onaddstream = obj => {
-        const stream = obj.stream;
+      pc.onaddstream = evt => {
+        const stream = evt.stream;
+
+        stream.onaddtrack = evt => {
+          console.log('remote stream onaddtrack', evt);
+        };
+
+        stream.onremovetrack = evt => {
+          console.log('remote stream onremovetrack', evt);
+        };
+
+        stream.onactive = evt => {
+          console.log('remote stream onactive', evt);
+        };
+
+        stream.oninactive = evt => {
+          console.log('remote stream oninactive', evt);
+        };
 
         console.log([
           `onaddstream. remote stream has ${stream.getVideoTracks().length} video tracks`,
