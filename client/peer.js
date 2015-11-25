@@ -114,9 +114,9 @@ export default function Peer(opts) {
        * @api private
        */
       pc.oniceconnectionstatechange = () => {
+        console.log(`oniceconnectionstatechange: ${pc.iceConnectionState}`);
         if (pc.iceConnectionState === 'connected') {
           isConnected = true;
-          console.log('connected.');
         }
       };
 
@@ -248,6 +248,7 @@ export default function Peer(opts) {
         return;
       }
 
+      console.log('calling getUserMedia');
       return getUserMedia({
         audio: true,
         video: true
@@ -349,6 +350,8 @@ export default function Peer(opts) {
   function end() {
     if (pc) {
       removeLocalTracks();
+      pc.close();
+      pc = null;
     }
 
     socket.removeListener('signal', handleSignal);
