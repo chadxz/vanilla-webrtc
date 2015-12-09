@@ -114,9 +114,11 @@ export default function Peer(opts) {
        * @api private
        */
       pc.oniceconnectionstatechange = () => {
+        if (!pc) { return; }
         console.log(`oniceconnectionstatechange: ${pc.iceConnectionState}`);
-        if (pc.iceConnectionState === 'connected') {
+        if (['connected', 'completed'].indexOf(pc.iceConnectionState) !== -1) {
           isConnected = true;
+          didSetRemoteDescription = false;
         }
       };
 
@@ -160,12 +162,16 @@ export default function Peer(opts) {
     });
   }
 
-  function shareMedia(constraints) {
+  function shareMedia(constraints = { audio: true, video: true }) {
     ensurePeerConnection().then(() => {
       if (!constraints.audio && !constraints.video) {
+        if (!isConnected) {
+          throw new Error('cannot start a WebRTC call without any media');
+        }
         return;
       }
 
+      console.log('calling getUserMedia with constraints', constraints);
       return getUserMedia(constraints);
     }).then(stream => {
       removeLocalTracks();
@@ -232,7 +238,7 @@ export default function Peer(opts) {
     console.log('received ice candidate', icecandidate);
     if (didSetRemoteDescription) {
       pc.addIceCandidate(new RTCIceCandidate(icecandidate));
-    } else {
+    } else if (!isConnected) {
       queuedIceCandidates.push(new RTCIceCandidate(icecandidate));
     }
   }
@@ -259,20 +265,6 @@ export default function Peer(opts) {
     }).then(() => {
       didSetRemoteDescription = true;
       processQueuedCandidates();
-
-      if (isConnected) {
-        return;
-      }
-
-      console.log('calling getUserMedia');
-      return getUserMedia({
-        audio: true,
-        video: true
-      }).then(stream => {
-        addLocalTracksFromStream(stream);
-        $localVideo.srcObject = stream;
-        $localVideo.play();
-      });
     }).then(() => {
       return pc.createAnswer();
     }).then(answer => {
@@ -344,10 +336,6 @@ export default function Peer(opts) {
     return !!(pc && pc.getLocalStreams().length && pc.getLocalStreams()[0].getVideoTracks().length);
   }
 
-  function share() {
-    shareMedia({ audio: true, video: true });
-  }
-
   function toggleAudio() {
     console.log(`audio is ${alreadySendingAudio() ? 'on' : 'off'}, toggling.`);
     shareMedia({ audio: !alreadySendingAudio(), video: alreadySendingVideo() });
@@ -380,7 +368,7 @@ export default function Peer(opts) {
 
   return {
     peerId,
-    share,
+    shareMedia,
     handleOffer,
     end,
     toggleAudio,

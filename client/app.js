@@ -128,7 +128,7 @@ socket.on('signal', signal => {
   peers.set(peerId, peer);
   controls.$toggleAudioButton.onclick = peer.toggleAudio;
   controls.$toggleVideoButton.onclick = peer.toggleVideo;
-  peer.handleOffer(signal);
+  peer.handleOffer(signal, { audio: true, video: false });
 });
 
 /**
@@ -156,7 +156,7 @@ socket.on('join', peerId => {
   peers.set(peerId, peer);
   controls.$toggleAudioButton.onclick = peer.toggleAudio;
   controls.$toggleVideoButton.onclick = peer.toggleVideo;
-  peer.share();
+  peer.shareMedia({ audio: true, video: false });
 });
 
 /**
