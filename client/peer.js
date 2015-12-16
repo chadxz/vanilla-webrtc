@@ -46,6 +46,9 @@ export default function Peer(opts) {
 
   function removeLocalTracks() {
     if (webrtcDetectedBrowser === 'firefox') {
+      pc.getLocalStreams().forEach(stream => {
+        stream.getTracks().forEach(track => track.stop());
+      });
       pc.getSenders().forEach(sender => {
         pc.removeTrack(sender);
       });
