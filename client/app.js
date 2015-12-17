@@ -9,6 +9,7 @@ Object.keys(webrtc).forEach(key => (
 const peers = window.peers = new Map();
 const $peers = document.getElementById('peers');
 const socket = io();
+let $joinButton;
 
 /**
  * Remove all HTML controls that are associated with a socketId
@@ -86,6 +87,30 @@ function createControls(peerId) {
 }
 
 /**
+ * Get rid of the start button, either after it was clicked or when
+ * receiving an incoming Peer Connection.
+ */
+function removeStartButton() {
+  if ($joinButton && $joinButton.parentNode) {
+    $joinButton.parentNode.removeChild($joinButton);
+  }
+}
+
+/**
+ * Add the button to the page which will allow the backend to broadcast that this
+ * socket has joined.
+ */
+function createStartButton() {
+  $joinButton = document.createElement('button');
+  $joinButton.innerText = 'start';
+  $joinButton.onclick = () => {
+    socket.emit('start');
+    removeStartButton();
+  };
+  document.getElementsByTagName('body')[0].appendChild($joinButton);
+}
+
+/**
  * socket.io handler for our local socket connecting to the server
  */
 socket.on('connect', () => {
@@ -122,6 +147,7 @@ socket.on('signal', signal => {
   const peer = new Peer({
     socket,
     peerId,
+    removeStartButton,
     ...controls
   });
 
@@ -150,6 +176,7 @@ socket.on('join', peerId => {
   const peer = new Peer({
     socket,
     peerId,
+    removeStartButton,
     ...controls
   });
 
@@ -177,3 +204,5 @@ socket.on('leave', socketId => {
     removeControls(socketId);
   }
 });
+
+createStartButton();

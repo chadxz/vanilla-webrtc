@@ -33,7 +33,8 @@ export default function Peer(opts) {
     peerId,
     socket,
     $localVideo,
-    $remoteVideo
+    $remoteVideo,
+    removeStartButton
     } = opts;
 
   const getUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
@@ -74,6 +75,8 @@ export default function Peer(opts) {
     if (pc) {
       return Promise.resolve();
     }
+
+    removeStartButton();
 
     return turnServerPromise.then(turnServers => {
       console.log('Creating peer with options', {iceServers: turnServers});

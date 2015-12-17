@@ -36,7 +36,8 @@ app.use(serveStatic(path.join(__dirname, 'public')));
 
 io.on('connection', (socket) => {
   console.log(`${socket.id} connected`);
-  io.emit('join', socket.id);
+
+  socket.on('start', () => io.emit('join', socket.id));
 
   socket.on('disconnect', () => {
     console.log(`${socket.id} disconnected`);
